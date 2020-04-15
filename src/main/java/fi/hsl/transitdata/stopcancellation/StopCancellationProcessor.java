@@ -19,7 +19,12 @@ public class StopCancellationProcessor {
         this.stopCancellations = stopCancellations.getStopCancellationsList().stream().collect(Collectors.groupingBy(InternalMessages.StopCancellation::getStopId));
     }
 
-    public GtfsRealtime.TripUpdate processStopCancellations(GtfsRealtime.TripUpdate tripUpdate) {
+    /**
+     * Applies stop cancellations to the trip update
+     * @param tripUpdate Trip update
+     * @return Trip update with stop cancellations applied
+     */
+    public GtfsRealtime.TripUpdate applyStopCancellations(GtfsRealtime.TripUpdate tripUpdate) {
         if (tripUpdate.getStopTimeUpdateCount() == 0) {
             //No stop time updates, no stops to cancel
             GtfsRealtime.TripDescriptor trip = tripUpdate.getTrip();

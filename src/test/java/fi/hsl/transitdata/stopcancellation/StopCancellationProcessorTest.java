@@ -49,7 +49,7 @@ public class StopCancellationProcessorTest {
                         .build())
                 .build();
 
-        GtfsRealtime.TripUpdate tripUpdateWithStopCancellations = stopCancellationProcessor.processStopCancellations(tripUpdate);
+        GtfsRealtime.TripUpdate tripUpdateWithStopCancellations = stopCancellationProcessor.applyStopCancellations(tripUpdate);
         Optional<GtfsRealtime.TripUpdate.StopTimeUpdate> stop3 = tripUpdateWithStopCancellations.getStopTimeUpdateList().stream()
                 .filter(stu -> "3".equals(stu.getStopId()))
                 .findAny();
@@ -83,7 +83,7 @@ public class StopCancellationProcessorTest {
                     .build())
                 .build();
 
-        GtfsRealtime.TripUpdate tripUpdateWithStopCancellations = stopCancellationProcessor.processStopCancellations(tripUpdate);
+        GtfsRealtime.TripUpdate tripUpdateWithStopCancellations = stopCancellationProcessor.applyStopCancellations(tripUpdate);
         Optional<GtfsRealtime.TripUpdate.StopTimeUpdate> stop1 = tripUpdateWithStopCancellations.getStopTimeUpdateList().stream()
                 .filter(stu -> "1".equals(stu.getStopId()))
                 .findAny();

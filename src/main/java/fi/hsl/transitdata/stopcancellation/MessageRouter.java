@@ -2,7 +2,6 @@ package fi.hsl.transitdata.stopcancellation;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.transit.realtime.GtfsRealtime;
-import com.typesafe.config.Config;
 import fi.hsl.common.gtfsrt.FeedMessageFactory;
 import fi.hsl.common.pulsar.IMessageHandler;
 import fi.hsl.common.pulsar.PulsarApplicationContext;
@@ -40,7 +39,7 @@ public class MessageRouter implements IMessageHandler {
                         stopCancellationProcessor.updateStopCancellations(InternalMessages.StopCancellations.parseFrom(received.getData()));
                     } else if (schema.schema == ProtobufSchema.GTFS_TripUpdate) {
                         final String tripId = received.getKey();
-                        final GtfsRealtime.TripUpdate tripUpdate = stopCancellationProcessor.processStopCancellations(GtfsRealtime.TripUpdate.parseFrom(received.getData()));
+                        final GtfsRealtime.TripUpdate tripUpdate = stopCancellationProcessor.applyStopCancellations(GtfsRealtime.TripUpdate.parseFrom(received.getData()));
 
                         sendTripUpdate(tripId, tripUpdate, received.getEventTime());
                     } else {
