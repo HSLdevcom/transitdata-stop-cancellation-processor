@@ -33,7 +33,7 @@ public class StopCancellationProcessor {
         }
 
         List<GtfsRealtime.TripUpdate.StopTimeUpdate> stopTimeUpdates = tripUpdate.getStopTimeUpdateList().stream().map(stopTimeUpdate -> {
-            if (!stopTimeUpdate.hasScheduleRelationship() || stopTimeUpdate.getScheduleRelationship() != GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SCHEDULED) {
+            if (stopTimeUpdate.hasScheduleRelationship() && stopTimeUpdate.getScheduleRelationship() != GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SCHEDULED) {
                 //Cannot apply cancellations to stop time updates that have no data or that are already cancelled
                 return stopTimeUpdate;
             }
