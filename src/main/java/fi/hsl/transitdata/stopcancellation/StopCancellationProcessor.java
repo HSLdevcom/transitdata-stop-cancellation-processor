@@ -13,10 +13,10 @@ import java.util.stream.Collectors;
 public class StopCancellationProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(StopCancellationProcessor.class);
 
-    private Map<String, List<InternalMessages.StopCancellation>> stopCancellations;
+    private Map<String, List<InternalMessages.StopCancellations.StopCancellation>> stopCancellations;
 
     public void updateStopCancellations(InternalMessages.StopCancellations stopCancellations) {
-        this.stopCancellations = stopCancellations.getStopCancellationsList().stream().collect(Collectors.groupingBy(InternalMessages.StopCancellation::getStopId));
+        this.stopCancellations = stopCancellations.getStopCancellationsList().stream().collect(Collectors.groupingBy(InternalMessages.StopCancellations.StopCancellation::getStopId));
     }
 
     /**
@@ -38,7 +38,7 @@ public class StopCancellationProcessor {
                 return stopTimeUpdate;
             }
 
-            List<InternalMessages.StopCancellation> cancellationsForStop = stopCancellations.getOrDefault(stopTimeUpdate.getStopId(), Collections.emptyList());
+            List<InternalMessages.StopCancellations.StopCancellation> cancellationsForStop = stopCancellations.getOrDefault(stopTimeUpdate.getStopId(), Collections.emptyList());
             if (cancellationsForStop.stream().anyMatch(cancellationForStop -> {
                 return stopTimeUpdate.getDeparture().getTime() >= cancellationForStop.getValidFromUtcMs() &&
                         stopTimeUpdate.getArrival().getTime() <= cancellationForStop.getValidToUtcMs();

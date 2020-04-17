@@ -35,7 +35,7 @@ public class MessageRouter implements IMessageHandler {
             Optional<TransitdataSchema> maybeSchema = TransitdataSchema.parseFromPulsarMessage(received);
             maybeSchema.ifPresent(schema -> {
                 try {
-                    if (schema.schema == ProtobufSchema.StopCancellation) {
+                    if (schema.schema == ProtobufSchema.StopCancellations) {
                         stopCancellationProcessor.updateStopCancellations(InternalMessages.StopCancellations.parseFrom(received.getData()));
                     } else if (schema.schema == ProtobufSchema.GTFS_TripUpdate) {
                         final String tripId = received.getKey();
