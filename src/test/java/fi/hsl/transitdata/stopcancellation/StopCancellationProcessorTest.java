@@ -18,9 +18,9 @@ public class StopCancellationProcessorTest {
         stopCancellationProcessor = new StopCancellationProcessor();
 
         InternalMessages.StopCancellations stopCancellations = InternalMessages.StopCancellations.newBuilder()
-                .addStopCancellations(InternalMessages.StopCancellation.newBuilder().setStopId("1").setValidFromUtcMs(0).setValidToUtcMs(1000).build())
-                .addStopCancellations(InternalMessages.StopCancellation.newBuilder().setStopId("1").setValidFromUtcMs(2000).setValidToUtcMs(3000).build())
-                .addStopCancellations(InternalMessages.StopCancellation.newBuilder().setStopId("2").setValidFromUtcMs(10000).setValidToUtcMs(15000).build())
+                .addStopCancellations(InternalMessages.StopCancellations.StopCancellation.newBuilder().setStopId("1").setValidFromUtcMs(0).setValidToUtcMs(1000).build())
+                .addStopCancellations(InternalMessages.StopCancellations.StopCancellation.newBuilder().setStopId("1").setValidFromUtcMs(2000).setValidToUtcMs(3000).build())
+                .addStopCancellations(InternalMessages.StopCancellations.StopCancellation.newBuilder().setStopId("2").setValidFromUtcMs(10000).setValidToUtcMs(15000).build())
                 .build();
         stopCancellationProcessor.updateStopCancellations(stopCancellations);
     }
