@@ -5,10 +5,10 @@ import fi.hsl.common.transitdata.proto.InternalMessages;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.Collection;
 import java.util.Optional;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class StopCancellationProcessorTest {
     private StopCancellationProcessor stopCancellationProcessor;
@@ -20,8 +20,8 @@ public class StopCancellationProcessorTest {
         InternalMessages.JourneyPattern journeyPattern1 = InternalMessages.JourneyPattern.newBuilder()
                 .setJourneyPatternId("1")
                 .addStops(InternalMessages.JourneyPattern.Stop.newBuilder().setStopId("1").setStopSequence(1))
-                .addStops(InternalMessages.JourneyPattern.Stop.newBuilder().setStopId("2").setStopSequence(1))
-                .addStops(InternalMessages.JourneyPattern.Stop.newBuilder().setStopId("3").setStopSequence(1))
+                .addStops(InternalMessages.JourneyPattern.Stop.newBuilder().setStopId("2").setStopSequence(2))
+                .addStops(InternalMessages.JourneyPattern.Stop.newBuilder().setStopId("3").setStopSequence(3))
                 .addTrips(InternalMessages.TripInfo.newBuilder().setTripId("1").setRouteId("1001").setOperatingDay("20200101").setStartTime("12:00:00").setDirectionId(1).build())
                 .build();
 
@@ -120,6 +120,33 @@ public class StopCancellationProcessorTest {
         assertTrue(stop1.isPresent());
         assertEquals("1", stop1.get().getStopId());
         assertEquals(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED, stop1.get().getScheduleRelationship());
+    }
+
+    @Test
+    public void testNoDataTripUpdatesAreCreated() {
+        final long timestamp = System.currentTimeMillis();
+
+        Collection<StopCancellationProcessor.TripUpdateWithId> tripUpdates = stopCancellationProcessor.getStopCancellationTripUpdates(timestamp);
+
+        assertEquals(2, tripUpdates.size());
+
+        Optional<GtfsRealtime.TripUpdate> maybeTrip1 = tripUpdates.stream()
+                .filter(tripUpdateWithId -> "1".equals(tripUpdateWithId.id))
+                .map(tripUpdateWithId -> tripUpdateWithId.tripUpdate)
+                .findAny();
+
+        assertTrue(maybeTrip1.isPresent());
+
+        GtfsRealtime.TripUpdate trip1 = maybeTrip1.get();
+
+        assertEquals(3, trip1.getStopTimeUpdateCount());
+
+        assertEquals("1", trip1.getStopTimeUpdate(0).getStopId());
+        assertEquals(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED, trip1.getStopTimeUpdate(0).getScheduleRelationship());
+        assertEquals("2", trip1.getStopTimeUpdate(1).getStopId());
+        assertEquals(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA, trip1.getStopTimeUpdate(1).getScheduleRelationship());
+        assertEquals("3", trip1.getStopTimeUpdate(2).getStopId());
+        assertEquals(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA, trip1.getStopTimeUpdate(2).getScheduleRelationship());
     }
 
 }

@@ -20,8 +20,8 @@ import java.util.*;
 public class MessageRouter implements IMessageHandler {
     private static final Logger log = LoggerFactory.getLogger(MessageRouter.class);
 
-    private Consumer<byte[]> consumer;
-    private Producer<byte[]> producer;
+    private final Consumer<byte[]> consumer;
+    private final Producer<byte[]> producer;
 
     private StopCancellationProcessor stopCancellationProcessor = new StopCancellationProcessor();
 
@@ -37,6 +37,11 @@ public class MessageRouter implements IMessageHandler {
                 try {
                     if (schema.schema == ProtobufSchema.StopCancellations) {
                         stopCancellationProcessor.updateStopCancellations(InternalMessages.StopCancellations.parseFrom(received.getData()));
+
+                        //Create NO_DATA trip updates for trips that have cancelled stops but are not producing trip updates yet
+                        stopCancellationProcessor.getStopCancellationTripUpdates(received.getEventTime()).forEach(tripUpdateWithId -> {
+                            sendTripUpdate(tripUpdateWithId.id, tripUpdateWithId.tripUpdate, received.getEventTime());
+                        });
                     } else if (schema.schema == ProtobufSchema.GTFS_TripUpdate) {
                         final String tripId = received.getKey();
                         final GtfsRealtime.TripUpdate tripUpdate = stopCancellationProcessor.applyStopCancellations(GtfsRealtime.TripUpdate.parseFrom(received.getData()));
