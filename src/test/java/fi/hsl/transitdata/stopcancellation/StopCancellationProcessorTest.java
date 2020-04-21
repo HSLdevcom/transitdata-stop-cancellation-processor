@@ -17,10 +17,39 @@ public class StopCancellationProcessorTest {
     public void setup() {
         stopCancellationProcessor = new StopCancellationProcessor();
 
+        InternalMessages.JourneyPattern journeyPattern1 = InternalMessages.JourneyPattern.newBuilder()
+                .setJourneyPatternId("1")
+                .addStops(InternalMessages.JourneyPattern.Stop.newBuilder().setStopId("1").setStopSequence(1))
+                .addStops(InternalMessages.JourneyPattern.Stop.newBuilder().setStopId("2").setStopSequence(1))
+                .addStops(InternalMessages.JourneyPattern.Stop.newBuilder().setStopId("3").setStopSequence(1))
+                .addTrips(InternalMessages.TripInfo.newBuilder().setTripId("1").setRouteId("1001").setOperatingDay("20200101").setStartTime("12:00:00").setDirectionId(1).build())
+                .build();
+
+        InternalMessages.JourneyPattern journeyPattern2 = InternalMessages.JourneyPattern.newBuilder()
+                .setJourneyPatternId("2")
+                .addStops(InternalMessages.JourneyPattern.Stop.newBuilder().setStopId("1").setStopSequence(3))
+                .addStops(InternalMessages.JourneyPattern.Stop.newBuilder().setStopId("2").setStopSequence(2))
+                .addStops(InternalMessages.JourneyPattern.Stop.newBuilder().setStopId("3").setStopSequence(1))
+                .addTrips(InternalMessages.TripInfo.newBuilder().setTripId("2").setRouteId("1001").setOperatingDay("20200101").setStartTime("12:00:00").setDirectionId(2).build())
+                .build();
+
         InternalMessages.StopCancellations stopCancellations = InternalMessages.StopCancellations.newBuilder()
-                .addStopCancellations(InternalMessages.StopCancellations.StopCancellation.newBuilder().setStopId("1").setValidFromUtcMs(0).setValidToUtcMs(1000).build())
-                .addStopCancellations(InternalMessages.StopCancellations.StopCancellation.newBuilder().setStopId("1").setValidFromUtcMs(2000).setValidToUtcMs(3000).build())
-                .addStopCancellations(InternalMessages.StopCancellations.StopCancellation.newBuilder().setStopId("2").setValidFromUtcMs(10000).setValidToUtcMs(15000).build())
+                .addAffectedJourneyPatterns(journeyPattern1)
+                .addAffectedJourneyPatterns(journeyPattern2)
+                .addStopCancellations(InternalMessages.StopCancellations.StopCancellation.newBuilder()
+                        .setStopId("1")
+                        .setValidFromUtcMs(0)
+                        .setValidToUtcMs(1000)
+                        .addAffectedJourneyPatternIds("1")
+                        .addAffectedJourneyPatternIds("2"))
+                .addStopCancellations(InternalMessages.StopCancellations.StopCancellation.newBuilder()
+                        .setStopId("1")
+                        .setValidFromUtcMs(2000)
+                        .setValidToUtcMs(3000))
+                .addStopCancellations(InternalMessages.StopCancellations.StopCancellation.newBuilder()
+                        .setStopId("2")
+                        .setValidFromUtcMs(10000)
+                        .setValidToUtcMs(15000))
                 .build();
         stopCancellationProcessor.updateStopCancellations(stopCancellations);
     }
@@ -28,7 +57,7 @@ public class StopCancellationProcessorTest {
     @Test
     public void testScheduleRelationshipIsNotChangedForStopThatIsNotCancelled() {
         GtfsRealtime.TripUpdate tripUpdate = GtfsRealtime.TripUpdate.newBuilder()
-                .setTrip(GtfsRealtime.TripDescriptor.newBuilder().setTripId("trip_1").build())
+                .setTrip(GtfsRealtime.TripDescriptor.newBuilder().setRouteId("1001").setStartDate("20200101").setStartTime("12:00:00").setDirectionId(0).build())
                 .addStopTimeUpdate(GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder()
                         .setStopId("1")
                         .setArrival(GtfsRealtime.TripUpdate.StopTimeEvent.newBuilder().setTime(0L).build())
@@ -62,7 +91,7 @@ public class StopCancellationProcessorTest {
     @Test
     public void testScheduleRelationshipIsChangedForStopIsCancelled() {
         GtfsRealtime.TripUpdate tripUpdate = GtfsRealtime.TripUpdate.newBuilder()
-                .setTrip(GtfsRealtime.TripDescriptor.newBuilder().setTripId("trip_1").build())
+                .setTrip(GtfsRealtime.TripDescriptor.newBuilder().setRouteId("1001").setStartDate("20200101").setStartTime("12:00:00").setDirectionId(0).build())
                 .addStopTimeUpdate(GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder()
                     .setStopId("1")
                     .setArrival(GtfsRealtime.TripUpdate.StopTimeEvent.newBuilder().setTime(0L).build())
