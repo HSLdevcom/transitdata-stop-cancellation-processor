@@ -43,10 +43,22 @@ public class MessageRouter implements IMessageHandler {
                             sendTripUpdate(tripUpdateWithId.id, tripUpdateWithId.tripUpdate, received.getEventTime());
                         });
                     } else if (schema.schema == ProtobufSchema.GTFS_TripUpdate) {
-                        final String tripId = received.getKey();
-                        final GtfsRealtime.TripUpdate tripUpdate = stopCancellationProcessor.applyStopCancellations(GtfsRealtime.TripUpdate.parseFrom(received.getData()));
+                        final GtfsRealtime.FeedMessage feedMessage = GtfsRealtime.FeedMessage.parseFrom(received.getData());
 
-                        sendTripUpdate(tripId, tripUpdate, received.getEventTime());
+                        if (feedMessage.getEntityCount() == 1) {
+                            final GtfsRealtime.FeedEntity entity = feedMessage.getEntity(0);
+
+                            if (entity.hasTripUpdate()) {
+                                final String tripId = received.getKey();
+                                final GtfsRealtime.TripUpdate tripUpdate = stopCancellationProcessor.applyStopCancellations(feedMessage.getEntity(0).getTripUpdate());
+
+                                sendTripUpdate(tripId, tripUpdate, received.getEventTime());
+                            } else {
+                                log.warn("Feed entity {} did not contain a trip update", entity.getId());
+                            }
+                        } else {
+                            log.warn("Feed message had invalid amount of entities: {}, expected 1", feedMessage.getEntityCount());
+                        }
                     } else {
                         log.warn("Received message with unknown schema ({}), ignoring", schema);
                     }
