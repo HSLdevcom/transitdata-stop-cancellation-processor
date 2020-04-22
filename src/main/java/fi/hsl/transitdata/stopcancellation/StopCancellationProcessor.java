@@ -81,8 +81,8 @@ public class StopCancellationProcessor {
 
 
     private boolean affectsStopTimeUpdate(InternalMessages.StopCancellations.StopCancellation stopCancellation, GtfsRealtime.TripDescriptor trip, GtfsRealtime.TripUpdate.StopTimeUpdate stopTimeUpdate) {
-        return stopTimeUpdate.getDeparture().getTime() >= stopCancellation.getValidFromUtcMs() &&
-                stopTimeUpdate.getArrival().getTime() <= stopCancellation.getValidToUtcMs() &&
+        return stopTimeUpdate.getDeparture().getTime() >= stopCancellation.getValidFromUnixS() &&
+                stopTimeUpdate.getArrival().getTime() <= stopCancellation.getValidToUnixS() &&
                 stopCancellation.getAffectedJourneyPatternIdsList().stream()
                         .map(journeyPatternById::get)
                         .filter(Objects::nonNull)
