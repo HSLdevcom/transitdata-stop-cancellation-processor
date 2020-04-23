@@ -99,14 +99,20 @@ public class StopCancellationProcessor {
         //Keep track of trips that have produced trip updates (to avoid creating NO_DATA trip updates for them)
         tripsWithTripUpdates.put(tripUpdate.getTrip().toBuilder().clearScheduleRelationship().clearTripId().build(), true);
 
+        final GtfsRealtime.TripDescriptor trip = tripUpdate.getTrip();
+
         if (tripUpdate.getStopTimeUpdateCount() == 0) {
             //No stop time updates, no stops to cancel
-            GtfsRealtime.TripDescriptor trip = tripUpdate.getTrip();
             LOG.debug("Trip {} / {} / {} / {} had no stop time updates, cannot apply stop cancellations", trip.getRouteId(), trip.getStartDate(), trip.getStartTime(), trip.getDirectionId());
             return tripUpdate;
         }
 
         List<GtfsRealtime.TripUpdate.StopTimeUpdate> stopTimeUpdates = tripUpdate.getStopTimeUpdateList().stream().map(stopTimeUpdate -> {
+            if (!stopTimeUpdate.hasStopId()) {
+                LOG.debug("Cannot apply stop cancellations for stop time updates without stop ID (trip {} / {} / {} / {})", trip.getRouteId(), trip.getStartDate(), trip.getStartTime(), trip.getDirectionId());
+                return stopTimeUpdate;
+            }
+
             if (stopTimeUpdate.hasScheduleRelationship() && stopTimeUpdate.getScheduleRelationship() != GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SCHEDULED) {
                 //Cannot apply cancellations to stop time updates that have no data or that are already cancelled
                 return stopTimeUpdate;
