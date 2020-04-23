@@ -24,7 +24,7 @@ public class StopCancellationProcessor {
     private Map<TripIdentifier, String> journeyPatternIdByTripIdentifier;
 
     //Cache of trips that have produced trip updates
-    private Cache<GtfsRealtime.TripDescriptor, Boolean> tripsWithTripUpdates = Caffeine.newBuilder().expireAfterWrite(Duration.ofMinutes(10)).build();
+    private Cache<TripIdentifier, Boolean> tripsWithTripUpdates = Caffeine.newBuilder().expireAfterWrite(Duration.ofMinutes(10)).build();
 
     public void updateStopCancellations(InternalMessages.StopCancellations stopCancellations) {
         this.stopCancellationsByStopId = stopCancellations.getStopCancellationsList().stream().collect(Collectors.groupingBy(InternalMessages.StopCancellations.StopCancellation::getStopId));
@@ -47,28 +47,30 @@ public class StopCancellationProcessor {
         return journeyPatternById.values().stream().map(journeyPattern -> {
             List<TripUpdateWithId> tripUpdates = new ArrayList<>();
 
-            List<GtfsRealtime.TripUpdate.StopTimeUpdate> stopTimeUpdates = journeyPattern.getStopsList().stream().map(stop -> {
-                final String stopId = stop.getStopId();
+            final List<GtfsRealtime.TripUpdate.StopTimeUpdate> stopTimeUpdates = journeyPattern.getStopsList().stream()
+                    .sorted(Comparator.comparingInt(InternalMessages.JourneyPattern.Stop::getStopSequence))
+                    .map(stop -> {
+                        final String stopId = stop.getStopId();
 
-                GtfsRealtime.TripUpdate.StopTimeUpdate.Builder stopTimeUpdateBuilder = GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder().setStopId(stopId);
+                        GtfsRealtime.TripUpdate.StopTimeUpdate.Builder stopTimeUpdateBuilder = GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder().setStopId(stopId);
 
-                List<InternalMessages.StopCancellations.StopCancellation> stopCancellations = stopCancellationsByStopId.get(stopId);
-                if (stopCancellations != null &&
-                        stopCancellations.stream().anyMatch(stopCancellation -> stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPattern.getJourneyPatternId()))) {
-                    stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED);
-                } else {
-                    stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA);
-                }
+                        List<InternalMessages.StopCancellations.StopCancellation> stopCancellations = stopCancellationsByStopId.getOrDefault(stopId, Collections.emptyList());
+                        if (stopCancellations.stream().anyMatch(stopCancellation -> stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPattern.getJourneyPatternId()))) {
+                            stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED);
+                        } else {
+                            stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA);
+                        }
 
-                return stopTimeUpdateBuilder.build();
-            }).collect(Collectors.toList());
+                        return stopTimeUpdateBuilder.build();
+                    }).collect(Collectors.toList());
 
             for (InternalMessages.TripInfo tripInfo : journeyPattern.getTripsList()) {
-                final GtfsRealtime.TripDescriptor tripDescriptor = toTripDescriptor(tripInfo);
-                if (Boolean.TRUE.equals(tripsWithTripUpdates.getIfPresent(tripDescriptor))) {
+                if (Boolean.TRUE.equals(tripsWithTripUpdates.getIfPresent(TripIdentifier.fromTripInfo(tripInfo)))) {
                     //Trip had already published trip update, no need to create trip update with NO_DATA
                     continue;
                 }
+
+                final GtfsRealtime.TripDescriptor tripDescriptor = toTripDescriptor(tripInfo);
 
                 final String id = RouteIdUtils.isTrainRoute(tripInfo.getRouteId()) ?
                         getTrainEntityId(tripDescriptor) :
@@ -94,9 +96,9 @@ public class StopCancellationProcessor {
      */
     public GtfsRealtime.TripUpdate applyStopCancellations(GtfsRealtime.TripUpdate tripUpdate) {
         //Keep track of trips that have produced trip updates (to avoid creating NO_DATA trip updates for them)
-        tripsWithTripUpdates.put(tripUpdate.getTrip().toBuilder().clearScheduleRelationship().clearTripId().build(), true);
-
         final TripIdentifier tripIdentifier = TripIdentifier.fromGtfsTripDescriptor(tripUpdate.getTrip());
+
+        tripsWithTripUpdates.put(tripIdentifier, true);
 
         if (tripUpdate.getStopTimeUpdateCount() == 0) {
             //No stop time updates, no stops to cancel
