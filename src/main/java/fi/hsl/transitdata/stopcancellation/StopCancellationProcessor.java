@@ -115,19 +115,21 @@ public class StopCancellationProcessor {
 
         final InternalMessages.JourneyPattern journeyPattern = journeyPatternById.get(journeyPatternId);
 
-        final List<GtfsRealtime.TripUpdate.StopTimeUpdate> stopTimeUpdateList = journeyPattern.getStopsList().stream().map(stop -> {
-            final GtfsRealtime.TripUpdate.StopTimeUpdate stopTimeUpdate = stopTimeUpdates.containsKey(stop.getStopId()) ?
-                    stopTimeUpdates.get(stop.getStopId()) :
-                    GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder().setStopId(stop.getStopId()).setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA).build();
+        final List<GtfsRealtime.TripUpdate.StopTimeUpdate> stopTimeUpdateList = journeyPattern.getStopsList().stream()
+                .sorted(Comparator.comparingInt(InternalMessages.JourneyPattern.Stop::getStopSequence))
+                .map(stop -> {
+                    final GtfsRealtime.TripUpdate.StopTimeUpdate stopTimeUpdate = stopTimeUpdates.containsKey(stop.getStopId()) ?
+                            stopTimeUpdates.get(stop.getStopId()) :
+                            GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder().setStopId(stop.getStopId()).setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA).build();
 
-            if (stopCancellationsByStopId.getOrDefault(stop.getStopId(), Collections.emptyList()).stream().anyMatch(stopCancellation -> {
-                return stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPatternId);
-            })) {
-                return stopTimeUpdate.toBuilder().setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED).build();
-            } else {
-                return stopTimeUpdate;
-            }
-        }).collect(Collectors.toList());
+                    if (stopCancellationsByStopId.getOrDefault(stop.getStopId(), Collections.emptyList()).stream().anyMatch(stopCancellation -> {
+                        return stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPatternId);
+                    })) {
+                        return stopTimeUpdate.toBuilder().setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED).build();
+                    } else {
+                        return stopTimeUpdate;
+                    }
+                }).collect(Collectors.toList());
 
         //Replace original stop time updates with ones where stop cancellations have been applied
         return tripUpdate.toBuilder().clearStopTimeUpdate().addAllStopTimeUpdate(stopTimeUpdateList).build();
