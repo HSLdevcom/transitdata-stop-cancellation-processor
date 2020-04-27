@@ -13,8 +13,10 @@ public class TripInfoUtils {
     private TripInfoUtils() {}
 
     public static GtfsRealtime.TripDescriptor toTripDescriptor(InternalMessages.TripInfo tripInfo) {
+        // TODO: make sure that ScheduleRelationship needs to be set to SCHEDULED
         return GtfsRealtime.TripDescriptor.newBuilder()
                 .setRouteId(RouteIdUtils.normalizeRouteId(tripInfo.getRouteId()))
+                .setScheduleRelationship(GtfsRealtime.TripDescriptor.ScheduleRelationship.SCHEDULED)
                 .setStartDate(tripInfo.getOperatingDay())
                 .setStartTime(tripInfo.getStartTime())
                 .setDirectionId(PubtransFactory.joreDirectionToGtfsDirection(tripInfo.getDirectionId()))
