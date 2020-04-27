@@ -46,8 +46,8 @@ public class StopCancellationProcessor {
     public Collection<TripUpdateWithId> getStopCancellationTripUpdates(final long timestamp) {
         return journeyPatternById.values().stream().map(journeyPattern -> {
             List<TripUpdateWithId> tripUpdates = new ArrayList<>();
-
             final String firstStopId = TripInfoUtils.getFirstStopId(journeyPattern);
+
             final List<GtfsRealtime.TripUpdate.StopTimeUpdate> stopTimeUpdates = journeyPattern.getStopsList().stream()
                     .sorted(Comparator.comparingInt(InternalMessages.JourneyPattern.Stop::getStopSequence))
                     .map(stop -> {
@@ -58,11 +58,14 @@ public class StopCancellationProcessor {
                         List<InternalMessages.StopCancellations.StopCancellation> stopCancellations = stopCancellationsByStopId.getOrDefault(stopId, Collections.emptyList());
                         if (stopCancellations.stream().anyMatch(stopCancellation -> stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPattern.getJourneyPatternId()))) {
                             stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED);
-                        } else if (stop.getStopSequence() == 1) {
-                            // First stopTimeUpdate of the trip needs to be SCHEDULED TODO: make sure this indeed is the case
-                            stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SCHEDULED);
                         } else {
-                            stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA);
+                            // TODO: make sure these are really needed for OTP to make this work:
+                            stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SCHEDULED);
+                            if (!stop.getStopId().equals(firstStopId)){
+                                // Set delay of arrival and departure of other to 0 to meet OTP's expectations
+                                GtfsRealtime.TripUpdate.StopTimeEvent stopTimeDelay0 = GtfsRealtime.TripUpdate.StopTimeEvent.newBuilder().setDelay(0).build();
+                                stopTimeUpdateBuilder.setArrival(stopTimeDelay0).setDeparture(stopTimeDelay0);
+                            }
                         }
 
                         return stopTimeUpdateBuilder.build();
@@ -78,7 +81,7 @@ public class StopCancellationProcessor {
                 List<GtfsRealtime.TripUpdate.StopTimeUpdate> stopTimeUpdatesWithDeparture = stopTimeUpdates
                         .stream()
                         .map(stopTimeUpdate -> {
-                            if (firstStopId != null && stopTimeUpdate.getStopId() == firstStopId) {
+                            if (firstStopId != null && stopTimeUpdate.getStopId().equals(firstStopId)) {
                                 try {
                                     long departureTime = TripInfoUtils.getDepartureUnixTimeFromTripInfo(tripInfo);
                                     GtfsRealtime.TripUpdate.StopTimeEvent departure = GtfsRealtime.TripUpdate.StopTimeEvent.newBuilder()

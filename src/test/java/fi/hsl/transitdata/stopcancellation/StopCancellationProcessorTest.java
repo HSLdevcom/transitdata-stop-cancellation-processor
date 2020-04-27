@@ -123,7 +123,7 @@ public class StopCancellationProcessorTest {
     }
 
     @Test
-    public void testNoDataTripUpdatesAreCreated() {
+    public void testScheduledTripUpdatesAreCreated() {
         final long timestamp = System.currentTimeMillis();
 
         Collection<StopCancellationProcessor.TripUpdateWithId> tripUpdates = stopCancellationProcessor.getStopCancellationTripUpdates(timestamp);
@@ -144,9 +144,9 @@ public class StopCancellationProcessorTest {
         assertEquals("1", trip1.getStopTimeUpdate(0).getStopId());
         assertEquals(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED, trip1.getStopTimeUpdate(0).getScheduleRelationship());
         assertEquals("2", trip1.getStopTimeUpdate(1).getStopId());
-        assertEquals(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA, trip1.getStopTimeUpdate(1).getScheduleRelationship());
+        assertEquals(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SCHEDULED, trip1.getStopTimeUpdate(1).getScheduleRelationship());
         assertEquals("3", trip1.getStopTimeUpdate(2).getStopId());
-        assertEquals(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA, trip1.getStopTimeUpdate(2).getScheduleRelationship());
+        assertEquals(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SCHEDULED, trip1.getStopTimeUpdate(2).getScheduleRelationship());
     }
 
 }
