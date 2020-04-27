@@ -54,9 +54,20 @@ public class StopCancellationProcessor {
 
                         GtfsRealtime.TripUpdate.StopTimeUpdate.Builder stopTimeUpdateBuilder = GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder().setStopId(stopId);
 
+                        if (stop.getStopSequence() == 1) {
+                            // First stopTimeUpdate of the trip needs to have delay (or departure time) set to work with OTP
+                            GtfsRealtime.TripUpdate.StopTimeEvent departure = GtfsRealtime.TripUpdate.StopTimeEvent.newBuilder()
+                                    .setDelay(0)
+                                    .build();
+                            stopTimeUpdateBuilder.setDeparture(departure);
+                        }
+
                         List<InternalMessages.StopCancellations.StopCancellation> stopCancellations = stopCancellationsByStopId.getOrDefault(stopId, Collections.emptyList());
                         if (stopCancellations.stream().anyMatch(stopCancellation -> stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPattern.getJourneyPatternId()))) {
                             stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED);
+                        } else if (stop.getStopSequence() == 1) {
+                            // First stopTimeUpdate of the trip needs to be SCHEDULED
+                            stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SCHEDULED);
                         } else {
                             stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA);
                         }
