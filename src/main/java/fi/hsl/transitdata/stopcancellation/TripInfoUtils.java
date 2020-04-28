@@ -31,12 +31,10 @@ public class TripInfoUtils {
                 fromTripInfo.getDirectionId() == tripDescriptor.getDirectionId();
     }
 
-    public static long getDepartureUnixTimeFromTripInfo(InternalMessages.TripInfo tripInfo) {
+    public static long getUnixStartTimeFromTripInfo(InternalMessages.TripInfo tripInfo) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HH:mm:ss");
-        String dtStr = tripInfo.getOperatingDay()+"-"+tripInfo.getStartTime();
-        LocalDateTime dt = LocalDateTime.parse(dtStr, formatter);
-        ZoneId zone = ZoneId.of("Europe/Helsinki");
-        return dt.atZone(zone).toEpochSecond();
+        LocalDateTime dt = LocalDateTime.parse(tripInfo.getOperatingDay()+"-"+tripInfo.getStartTime(), formatter);
+        return dt.atZone(ZoneId.of("Europe/Helsinki")).toEpochSecond();
     }
 
     public static String getFirstStopId(InternalMessages.JourneyPattern journeyPattern) {

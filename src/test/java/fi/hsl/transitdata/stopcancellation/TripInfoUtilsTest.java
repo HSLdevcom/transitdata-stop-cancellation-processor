@@ -16,7 +16,7 @@ public class TripInfoUtilsTest {
                 .setStartTime("04:18:00")
                 .build();
 
-        long departureTime = TripInfoUtils.getDepartureUnixTimeFromTripInfo(tripInfo);
+        long departureTime = TripInfoUtils.getUnixStartTimeFromTripInfo(tripInfo);
         assertEquals(1588209480, departureTime);
     }
 }

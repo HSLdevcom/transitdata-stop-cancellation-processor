@@ -83,11 +83,11 @@ public class StopCancellationProcessor {
                         .map(stopTimeUpdate -> {
                             if (firstStopId != null && stopTimeUpdate.getStopId().equals(firstStopId)) {
                                 try {
-                                    long departureTime = TripInfoUtils.getDepartureUnixTimeFromTripInfo(tripInfo);
-                                    GtfsRealtime.TripUpdate.StopTimeEvent departure = GtfsRealtime.TripUpdate.StopTimeEvent.newBuilder()
-                                        .setTime(departureTime)
+                                    long startTimeUnix = TripInfoUtils.getUnixStartTimeFromTripInfo(tripInfo);
+                                    GtfsRealtime.TripUpdate.StopTimeEvent startTime = GtfsRealtime.TripUpdate.StopTimeEvent.newBuilder()
+                                        .setTime(startTimeUnix)
                                         .build();
-                                    return stopTimeUpdate.toBuilder().setDeparture(departure).build();
+                                    return stopTimeUpdate.toBuilder().setArrival(startTime).setDeparture(startTime).build();
                                 } catch (Exception e) {
                                     LOG.error("Failed to parse departure time from tripInfo");
                                     return stopTimeUpdate;
