@@ -46,7 +46,6 @@ public class StopCancellationProcessor {
     public Collection<TripUpdateWithId> getStopCancellationTripUpdates(final long timestamp) {
         return journeyPatternById.values().stream().map(journeyPattern -> {
             List<TripUpdateWithId> tripUpdates = new ArrayList<>();
-            final String firstStopId = TripInfoUtils.getFirstStopId(journeyPattern);
 
             final List<GtfsRealtime.TripUpdate.StopTimeUpdate> stopTimeUpdates = journeyPattern.getStopsList().stream()
                     .sorted(Comparator.comparingInt(InternalMessages.JourneyPattern.Stop::getStopSequence))
@@ -59,13 +58,7 @@ public class StopCancellationProcessor {
                         if (stopCancellations.stream().anyMatch(stopCancellation -> stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPattern.getJourneyPatternId()))) {
                             stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED);
                         } else {
-                            // TODO: make sure these are really needed for OTP to make this work:
-                            stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SCHEDULED);
-                            if (!stop.getStopId().equals(firstStopId)){
-                                // Set delay of arrival and departure of other to 0 to meet OTP's expectations
-                                GtfsRealtime.TripUpdate.StopTimeEvent stopTimeDelay0 = GtfsRealtime.TripUpdate.StopTimeEvent.newBuilder().setDelay(0).build();
-                                stopTimeUpdateBuilder.setArrival(stopTimeDelay0).setDeparture(stopTimeDelay0);
-                            }
+                            stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA);
                         }
 
                         return stopTimeUpdateBuilder.build();
@@ -77,25 +70,6 @@ public class StopCancellationProcessor {
                     continue;
                 }
 
-                // add departure time to the first stopTimeUpdate as it is needed in OTP
-                List<GtfsRealtime.TripUpdate.StopTimeUpdate> stopTimeUpdatesWithDeparture = stopTimeUpdates
-                        .stream()
-                        .map(stopTimeUpdate -> {
-                            if (firstStopId != null && stopTimeUpdate.getStopId().equals(firstStopId)) {
-                                try {
-                                    long startTimeUnix = TripInfoUtils.getUnixStartTimeFromTripInfo(tripInfo);
-                                    GtfsRealtime.TripUpdate.StopTimeEvent startTime = GtfsRealtime.TripUpdate.StopTimeEvent.newBuilder()
-                                        .setTime(startTimeUnix)
-                                        .build();
-                                    return stopTimeUpdate.toBuilder().setArrival(startTime).setDeparture(startTime).build();
-                                } catch (Exception e) {
-                                    LOG.error("Failed to parse departure time from tripInfo");
-                                    return stopTimeUpdate;
-                                }
-                            }
-                           return stopTimeUpdate;
-                        }).collect(Collectors.toList());
-
                 final GtfsRealtime.TripDescriptor tripDescriptor = toTripDescriptor(tripInfo);
 
                 final String id = RouteIdUtils.isTrainRoute(tripInfo.getRouteId()) ?
@@ -105,7 +79,7 @@ public class StopCancellationProcessor {
                 final GtfsRealtime.TripUpdate tripUpdate = GtfsRealtime.TripUpdate.newBuilder()
                         .setTrip(tripDescriptor)
                         .setTimestamp(timestamp)
-                        .addAllStopTimeUpdate(stopTimeUpdatesWithDeparture)
+                        .addAllStopTimeUpdate(stopTimeUpdates)
                         .build();
 
                 tripUpdates.add(new TripUpdateWithId(id, tripUpdate));
