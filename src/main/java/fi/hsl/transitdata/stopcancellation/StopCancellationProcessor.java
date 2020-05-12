@@ -95,10 +95,12 @@ public class StopCancellationProcessor {
         }).flatMap(List::stream).collect(Collectors.toList());
 
         List<TripUpdateWithId> cancellationsOfCancellations = tripsWithCancellations.asMap().entrySet().stream()
-                .filter(tripIdentifierAndId -> !journeyPatternIdByTripIdentifier.containsKey(tripIdentifierAndId.getKey()))
-                .filter(tripIdentifierAndId -> Boolean.FALSE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifierAndId.getKey())))
+                .filter(tripIdentifierAndId -> !journeyPatternIdByTripIdentifier.containsKey(tripIdentifierAndId.getKey())) //Trip does not have active cancellations
+                .filter(tripIdentifierAndId -> Boolean.FALSE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifierAndId.getKey()))) //Trip has not sent rip updates
                 .map(tripIdentifierAndId -> {
+                    //Create trip update that cancels cancellation
                     GtfsRealtime.TripUpdate tripUpdate = GtfsRealtime.TripUpdate.newBuilder()
+                            .setTimestamp(timestamp)
                             .setTrip(tripIdentifierAndId.getKey().toGtfsTripDescriptor())
                             .addStopTimeUpdate(GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder()
                                     .setStopSequence(1)
