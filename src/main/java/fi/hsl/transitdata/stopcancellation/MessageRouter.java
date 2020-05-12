@@ -23,7 +23,7 @@ public class MessageRouter implements IMessageHandler {
     private final Consumer<byte[]> consumer;
     private final Producer<byte[]> producer;
 
-    private StopCancellationProcessor stopCancellationProcessor = new StopCancellationProcessor();
+    private final StopCancellationProcessor stopCancellationProcessor = new StopCancellationProcessor();
 
     public MessageRouter(PulsarApplicationContext context) {
         consumer = context.getConsumer();

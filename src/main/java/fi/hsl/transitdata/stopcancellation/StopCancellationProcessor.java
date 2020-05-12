@@ -26,6 +26,9 @@ public class StopCancellationProcessor {
     //Cache of trips that have produced trip updates
     private Cache<TripIdentifier, Boolean> tripsWithTripUpdates = Caffeine.newBuilder().expireAfterWrite(Duration.ofMinutes(10)).build();
 
+    //Cache of trips that we have sent trip updates with cancelled stops
+    private Cache<TripIdentifier, Boolean> tripsWithCancellations = Caffeine.newBuilder().expireAfterWrite(Duration.ofDays(3)).build(); //TODO: duration should be configurable
+
     public void updateStopCancellations(InternalMessages.StopCancellations stopCancellations) {
         this.stopCancellationsByStopId = stopCancellations.getStopCancellationsList().stream().collect(Collectors.groupingBy(InternalMessages.StopCancellations.StopCancellation::getStopId));
         this.journeyPatternById = stopCancellations.getAffectedJourneyPatternsList().stream().collect(Collectors.toMap(InternalMessages.JourneyPattern::getJourneyPatternId, Function.identity()));
@@ -69,6 +72,9 @@ public class StopCancellationProcessor {
                     //Trip had already published trip update, no need to create trip update with NO_DATA
                     continue;
                 }
+
+                //Add cancellation to cache so that it can be cancelled later (cancellation-of-cancellation)
+                tripsWithCancellations.put(TripIdentifier.fromTripInfo(tripInfo), true);
 
                 final GtfsRealtime.TripDescriptor tripDescriptor = toTripDescriptor(tripInfo);
 
