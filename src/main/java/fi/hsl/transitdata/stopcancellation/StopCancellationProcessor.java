@@ -24,10 +24,10 @@ public class StopCancellationProcessor {
     private Map<TripIdentifier, String> journeyPatternIdByTripIdentifier;
 
     //Cache of trips that have produced trip updates
-    private Cache<TripIdentifier, Boolean> tripsWithTripUpdates = Caffeine.newBuilder().expireAfterWrite(Duration.ofMinutes(10)).build();
+    private final Cache<TripIdentifier, Boolean> tripsWithTripUpdates = Caffeine.newBuilder().expireAfterWrite(Duration.ofMinutes(10)).build();
 
     //Cache of trips that we have sent trip updates with cancelled stops
-    private Cache<TripIdentifier, String> tripsWithCancellations = Caffeine.newBuilder().expireAfterWrite(Duration.ofDays(3)).build(); //TODO: duration should be configurable
+    private final Cache<TripIdentifier, String> tripsWithCancellations = Caffeine.newBuilder().expireAfterWrite(Duration.ofDays(3)).build(); //TODO: duration should be configurable
 
     public void updateStopCancellations(InternalMessages.StopCancellations stopCancellations) {
         this.stopCancellationsByStopId = stopCancellations.getStopCancellationsList().stream().collect(Collectors.groupingBy(InternalMessages.StopCancellations.StopCancellation::getStopId));
@@ -68,19 +68,21 @@ public class StopCancellationProcessor {
                     }).collect(Collectors.toList());
 
             for (InternalMessages.TripInfo tripInfo : journeyPattern.getTripsList()) {
-                if (Boolean.TRUE.equals(tripsWithTripUpdates.getIfPresent(TripIdentifier.fromTripInfo(tripInfo)))) {
+                final TripIdentifier tripIdentifier = TripIdentifier.fromTripInfo(tripInfo);
+
+                if (Boolean.TRUE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifier))) {
                     //Trip had already published trip update, no need to create trip update with NO_DATA
                     continue;
                 }
 
-                final GtfsRealtime.TripDescriptor tripDescriptor = toTripDescriptor(tripInfo);
+                final GtfsRealtime.TripDescriptor tripDescriptor = tripIdentifier.toGtfsTripDescriptor();
 
                 final String id = RouteIdUtils.isTrainRoute(tripInfo.getRouteId()) ?
                         getTrainEntityId(tripDescriptor) :
                         tripInfo.getTripId();
 
                 //Add cancellation to cache so that it can be cancelled later (cancellation-of-cancellation)
-                tripsWithCancellations.put(TripIdentifier.fromTripInfo(tripInfo), id);
+                tripsWithCancellations.put(tripIdentifier, id);
 
                 final GtfsRealtime.TripUpdate tripUpdate = GtfsRealtime.TripUpdate.newBuilder()
                         .setTrip(tripDescriptor)
