@@ -2,6 +2,7 @@ package fi.hsl.transitdata.stopcancellation;
 
 import com.google.transit.realtime.GtfsRealtime;
 import fi.hsl.common.transitdata.proto.InternalMessages;
+import fi.hsl.transitdata.stopcancellation.models.TripUpdateWithId;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -126,7 +127,7 @@ public class StopCancellationProcessorTest {
     public void testNoDataTripUpdatesAreCreated() {
         final long timestamp = System.currentTimeMillis();
 
-        Collection<StopCancellationProcessor.TripUpdateWithId> tripUpdates = stopCancellationProcessor.getStopCancellationTripUpdates(timestamp);
+        Collection<TripUpdateWithId> tripUpdates = stopCancellationProcessor.getStopCancellationTripUpdates(timestamp);
 
         assertEquals(2, tripUpdates.size());
 
