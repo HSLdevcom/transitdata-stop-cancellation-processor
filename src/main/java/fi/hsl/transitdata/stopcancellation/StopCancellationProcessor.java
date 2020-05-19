@@ -86,6 +86,8 @@ public class StopCancellationProcessor {
 
                                 List<InternalMessages.StopCancellations.StopCancellation> stopCancellations = stopCancellationsByStopId.getOrDefault(stopId, Collections.emptyList());
                                 if (stopCancellations.stream().anyMatch(stopCancellation -> stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPattern.getJourneyPatternId()))) {
+                                    //TODO We should consider that two stop cancellations may affect the same journey pattern at different times (overlapping or not)
+                                    //TODO Thus this functionality and possibly also StopCancellations protobuf schema should be revised somehow...
                                     stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED);
                                 } else {
                                     stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA);
@@ -184,6 +186,7 @@ public class StopCancellationProcessor {
 
                     final boolean stopCancelled = stopCancellationsByStopId.getOrDefault(stop.getStopId(), Collections.emptyList()).stream()
                             .anyMatch(stopCancellation -> stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPatternId));
+                            //TODO also here; we should probably check that the stop is cancelled (or closed) at the time of the trip?
 
                     if (stopCancelled) {
                         LOG.debug("Cancelled stop {} for trip {}", stop.getStopId(), tripIdentifier);
