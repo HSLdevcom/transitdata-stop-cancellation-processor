@@ -10,7 +10,8 @@ import fi.hsl.transitdata.stopcancellation.models.TripUpdateWithId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -19,6 +20,8 @@ import static fi.hsl.transitdata.stopcancellation.TripInfoUtils.*;
 
 public class StopCancellationProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(StopCancellationProcessor.class);
+
+    private final ZoneId timezone;
 
     private Map<String, List<InternalMessages.StopCancellations.StopCancellation>> stopCancellationsByStopId;
     private Map<String, InternalMessages.JourneyPattern> journeyPatternById;
@@ -29,6 +32,10 @@ public class StopCancellationProcessor {
 
     //Cache of trips that we have sent trip updates with cancelled stops
     private final Cache<TripIdentifier, String> tripsWithCancellations = Caffeine.newBuilder().expireAfterWrite(Duration.ofDays(3)).build(); //TODO: duration should be configurable
+
+    public StopCancellationProcessor(ZoneId timezone) {
+        this.timezone = timezone;
+    }
 
     public void updateStopCancellations(InternalMessages.StopCancellations stopCancellations) {
         this.stopCancellationsByStopId = stopCancellations.getStopCancellationsList().stream().collect(Collectors.groupingBy(InternalMessages.StopCancellations.StopCancellation::getStopId));
@@ -82,18 +89,17 @@ public class StopCancellationProcessor {
                             .map(stop -> {
                                 final String stopId = stop.getStopId();
 
-                                GtfsRealtime.TripUpdate.StopTimeUpdate.Builder stopTimeUpdateBuilder = GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder().setStopId(stopId);
-
                                 List<InternalMessages.StopCancellations.StopCancellation> stopCancellations = stopCancellationsByStopId.getOrDefault(stopId, Collections.emptyList());
-                                if (stopCancellations.stream().anyMatch(stopCancellation -> stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPattern.getJourneyPatternId()))) {
-                                    //TODO We should consider that two stop cancellations may affect the same journey pattern at different times (overlapping or not)
-                                    //TODO Thus this functionality and possibly also StopCancellations protobuf schema should be revised somehow...
-                                    stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED);
-                                } else {
-                                    stopTimeUpdateBuilder.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA);
-                                }
+                                final boolean affectedByStopCancellation = stopCancellations.stream()
+                                        .anyMatch(stopCancellation ->
+                                                stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPattern.getJourneyPatternId())
+                                        );
+                                //TODO We should consider that two stop cancellations may affect the same journey pattern at different times (overlapping or not)
+                                //TODO Thus this functionality and possibly also StopCancellations protobuf schema should be revised somehow...
 
-                                return stopTimeUpdateBuilder.build();
+                                return affectedByStopCancellation ?
+                                        createSkippedStopTimeUpdate(stopId) :
+                                        createNoDataStopTimeUpdate(stopId);
                             }).collect(Collectors.toList());
 
                     for (InternalMessages.TripInfo tripInfo : journeyPattern.getTripsList()) {
@@ -106,12 +112,12 @@ public class StopCancellationProcessor {
 
                         final GtfsRealtime.TripDescriptor tripDescriptor = tripIdentifier.toGtfsTripDescriptor();
 
-                        final String id = RouteIdUtils.isTrainRoute(tripInfo.getRouteId()) ?
+                        final String entityId = RouteIdUtils.isTrainRoute(tripInfo.getRouteId()) ?
                                 getTrainEntityId(tripDescriptor) :
                                 tripInfo.getTripId();
 
                         //Add cancellation to cache so that it can be cancelled later (cancellation-of-cancellation)
-                        tripsWithCancellations.put(tripIdentifier, id);
+                        tripsWithCancellations.put(tripIdentifier, entityId);
 
                         final GtfsRealtime.TripUpdate tripUpdate = GtfsRealtime.TripUpdate.newBuilder()
                                 .setTrip(tripDescriptor)
@@ -119,7 +125,7 @@ public class StopCancellationProcessor {
                                 .addAllStopTimeUpdate(stopTimeUpdates)
                                 .build();
 
-                        tripUpdates.add(new TripUpdateWithId(id, tripUpdate));
+                        tripUpdates.add(new TripUpdateWithId(entityId, tripUpdate));
                     }
 
                     return tripUpdates;
@@ -182,10 +188,12 @@ public class StopCancellationProcessor {
                 .map(stop -> {
                     final GtfsRealtime.TripUpdate.StopTimeUpdate stopTimeUpdate = stopTimeUpdates.containsKey(stop.getStopId()) ?
                             stopTimeUpdates.get(stop.getStopId()) :
-                            GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder().setStopId(stop.getStopId()).setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA).build();
+                            createNoDataStopTimeUpdate(stop.getStopId());
 
                     final boolean stopCancelled = stopCancellationsByStopId.getOrDefault(stop.getStopId(), Collections.emptyList()).stream()
-                            .anyMatch(stopCancellation -> stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPatternId));
+                            .anyMatch(stopCancellation ->
+                                    stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPatternId)
+                            );
                             //TODO also here; we should probably check that the stop is cancelled (or closed) at the time of the trip?
 
                     if (stopCancelled) {
@@ -198,6 +206,20 @@ public class StopCancellationProcessor {
 
         //Replace original stop time updates with ones where stop cancellations have been applied
         return tripUpdate.toBuilder().clearStopTimeUpdate().addAllStopTimeUpdate(stopTimeUpdateList).build();
+    }
+
+    private static GtfsRealtime.TripUpdate.StopTimeUpdate createNoDataStopTimeUpdate(final String stopId) {
+        return GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder()
+                .setStopId(stopId)
+                .setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA)
+                .build();
+    }
+
+    private static GtfsRealtime.TripUpdate.StopTimeUpdate createSkippedStopTimeUpdate(final String stopId) {
+        return GtfsRealtime.TripUpdate.StopTimeUpdate.newBuilder()
+                .setStopId(stopId)
+                .setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED)
+                .build();
     }
 
     private static class TripIdentifier {
@@ -223,6 +245,21 @@ public class StopCancellationProcessor {
 
         public GtfsRealtime.TripDescriptor toGtfsTripDescriptor() {
             return GtfsRealtime.TripDescriptor.newBuilder().setRouteId(routeId).setStartDate(operatingDate).setStartTime(startTime).setDirectionId(directionId).build();
+        }
+
+        public ZonedDateTime getZonedStartTime(ZoneId zoneId) {
+            final LocalDate date = LocalDate.parse(operatingDate, DateTimeFormatter.BASIC_ISO_DATE);
+
+            final String[] timeParts = startTime.split(":");
+            final int hours = Integer.parseInt(timeParts[0]);
+            final int minutes = Integer.parseInt(timeParts[1]);
+            final int seconds = Integer.parseInt(timeParts[2]);
+
+            final LocalDateTime localDateTime = hours >= 24 ?
+                    date.plusDays(1).atTime(hours - 24, minutes, seconds) :
+                    date.atTime(hours, minutes, seconds);
+
+            return localDateTime.atZone(zoneId);
         }
 
         @Override

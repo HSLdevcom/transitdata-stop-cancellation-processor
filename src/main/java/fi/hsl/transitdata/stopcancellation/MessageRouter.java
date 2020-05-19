@@ -15,6 +15,7 @@ import org.apache.pulsar.client.api.Producer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.ZoneId;
 import java.util.*;
 
 public class MessageRouter implements IMessageHandler {
@@ -23,11 +24,13 @@ public class MessageRouter implements IMessageHandler {
     private final Consumer<byte[]> consumer;
     private final Producer<byte[]> producer;
 
-    private final StopCancellationProcessor stopCancellationProcessor = new StopCancellationProcessor();
+    private final StopCancellationProcessor stopCancellationProcessor;
 
     public MessageRouter(PulsarApplicationContext context) {
         consumer = context.getConsumer();
         producer = context.getProducer();
+
+        stopCancellationProcessor = new StopCancellationProcessor(ZoneId.of(context.getConfig().getString("processor.timezone")));
     }
 
     public void handleMessage(Message received) throws Exception {
