@@ -15,6 +15,8 @@ import static org.junit.Assert.*;
 public class StopCancellationProcessorTest {
     private StopCancellationProcessor stopCancellationProcessor;
 
+    //TODO: update tests: only trips that start when cancellation is valid should get stop cancellations, cancellations of cancellations should work, multiple stop cancellations for same trip should work
+
     @Before
     public void setup() {
         stopCancellationProcessor = new StopCancellationProcessor(ZoneId.of("Europe/Helsinki"));
