@@ -77,7 +77,7 @@ public class StopCancellationProcessor {
     private Collection<TripUpdateWithId> getTripUpdatesForCancellationsOfCancellations(final long timestamp) {
         return tripsWithCancellations.asMap().entrySet().stream()
                 .filter(tripIdentifierAndId -> !journeyPatternIdByTripIdentifier.containsKey(tripIdentifierAndId.getKey())) //Trip does not have active cancellations
-                .filter(tripIdentifierAndId -> Boolean.FALSE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifierAndId.getKey()))) //Trip has not sent trip updates
+                .filter(tripIdentifierAndId -> !Boolean.TRUE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifierAndId.getKey()))) //Trip has not sent trip updates
                 .map(tripIdentifierAndId -> {
                     //Create trip update that cancels all stop cancellations
                     GtfsRealtime.TripUpdate tripUpdate = GtfsRealtime.TripUpdate.newBuilder()
