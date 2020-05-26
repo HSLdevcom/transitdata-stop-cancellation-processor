@@ -48,9 +48,18 @@ public class StopCancellationProcessor {
                 //Only single trip affected
                 journeyPatternIdByTripIdentifier.put(TripIdentifier.fromTripInfo(stopCancellation.getAffectedTrip()), stopCancellation.getAffectedJourneyPatternIds(0));
             } else {
+                final Instant from = Instant.ofEpochSecond(stopCancellation.getValidFromUnixS());
+                final Instant to = Instant.ofEpochSecond(stopCancellation.getValidToUnixS());
+
                 stopCancellation.getAffectedJourneyPatternIdsList().stream().map(journeyPatternById::get).forEach(journeyPattern -> {
                     journeyPattern.getTripsList().forEach(tripInfo -> {
-                        journeyPatternIdByTripIdentifier.put(TripIdentifier.fromTripInfo(tripInfo), journeyPattern.getJourneyPatternId());
+                        final TripIdentifier tripIdentifier = TripIdentifier.fromTripInfo(tripInfo);
+                        final Instant tripStartTime = tripIdentifier.getZonedStartTime(timezone).toInstant();
+
+                        //Add only trips that are affected by stop cancellations
+                        if (tripStartTime.isAfter(from) && tripStartTime.isBefore(to)) {
+                            journeyPatternIdByTripIdentifier.put(TripIdentifier.fromTripInfo(tripInfo), journeyPattern.getJourneyPatternId());
+                        }
                     });
                 });
             }
@@ -65,9 +74,9 @@ public class StopCancellationProcessor {
     private Collection<TripUpdateWithId> getTripUpdatesForCancellationsOfCancellations(final long timestamp) {
         return tripsWithCancellations.asMap().entrySet().stream()
                 .filter(tripIdentifierAndId -> !journeyPatternIdByTripIdentifier.containsKey(tripIdentifierAndId.getKey())) //Trip does not have any active cancellations
-                .filter(tripIdentifierAndId -> Boolean.FALSE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifierAndId.getKey()))) //Trip has not sent trip updates (which would effectively cancel cancellations)
+                .filter(tripIdentifierAndId -> !Boolean.TRUE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifierAndId.getKey()))) //Trip has not sent trip updates (which would effectively cancel cancellations)
                 .map(tripIdentifierAndId -> {
-                    //Create trip update that cancels cancellation
+                    //Create trip update that cancels all stop cancellations
                     GtfsRealtime.TripUpdate tripUpdate = GtfsRealtime.TripUpdate.newBuilder()
                             .setTimestamp(timestamp)
                             .setTrip(tripIdentifierAndId.getKey().toGtfsTripDescriptor())
@@ -142,7 +151,7 @@ public class StopCancellationProcessor {
                             final GtfsRealtime.TripUpdate tripUpdate = GtfsRealtime.TripUpdate.newBuilder()
                                     .setTrip(tripDescriptor)
                                     .setTimestamp(timestamp)
-                                    .addAllStopTimeUpdate(stopTimeUpdates)
+                                    .addAllStopTimeUpdate(stopTimeUpdatesWithCancellations)
                                     .build();
 
                             tripUpdates.add(new TripUpdateWithId(entityId, tripUpdate));
