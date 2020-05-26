@@ -34,9 +34,6 @@ public class StopCancellationProcessor {
     //Cache of trips that we have sent trip updates with cancelled stops
     private final Cache<TripIdentifier, String> tripsWithCancellations = Caffeine.newBuilder().expireAfterWrite(Duration.ofDays(3)).build(); //TODO: duration should be configurable
 
-    //TODO: think about cancellation-of-cancellation: what if multiple stops are cancelled and only one of the cancellations is cancelled?
-
-
     public StopCancellationProcessor(ZoneId timezone) {
         this.timezone = timezone;
     }
@@ -67,8 +64,8 @@ public class StopCancellationProcessor {
      */
     private Collection<TripUpdateWithId> getTripUpdatesForCancellationsOfCancellations(final long timestamp) {
         return tripsWithCancellations.asMap().entrySet().stream()
-                .filter(tripIdentifierAndId -> !journeyPatternIdByTripIdentifier.containsKey(tripIdentifierAndId.getKey())) //Trip does not have active cancellations
-                .filter(tripIdentifierAndId -> Boolean.FALSE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifierAndId.getKey()))) //Trip has not sent trip updates
+                .filter(tripIdentifierAndId -> !journeyPatternIdByTripIdentifier.containsKey(tripIdentifierAndId.getKey())) //Trip does not have any active cancellations
+                .filter(tripIdentifierAndId -> Boolean.FALSE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifierAndId.getKey()))) //Trip has not sent trip updates (which would effectively cancel cancellations)
                 .map(tripIdentifierAndId -> {
                     //Create trip update that cancels cancellation
                     GtfsRealtime.TripUpdate tripUpdate = GtfsRealtime.TripUpdate.newBuilder()
@@ -95,9 +92,7 @@ public class StopCancellationProcessor {
                 .map(journeyPattern -> {
                     List<TripUpdateWithId> tripUpdates = new ArrayList<>();
 
-                    //TODO We should consider that two stop cancellations may affect the same journey pattern at different times (overlapping or not)
-                    //TODO Thus this functionality and possibly also StopCancellations protobuf schema should be revised somehow...
-
+                    //NO_DATA stop time updates for the journey pattern
                     final List<GtfsRealtime.TripUpdate.StopTimeUpdate> stopTimeUpdates = journeyPattern.getStopsList().stream()
                             .sorted(Comparator.comparingInt(InternalMessages.JourneyPattern.Stop::getStopSequence))
                             .map(InternalMessages.JourneyPattern.Stop::getStopId)
@@ -187,10 +182,10 @@ public class StopCancellationProcessor {
      * @return Trip update with stop cancellations applied
      */
     public GtfsRealtime.TripUpdate applyStopCancellations(GtfsRealtime.TripUpdate tripUpdate) {
-        //Keep track of trips that have produced trip updates (to avoid creating NO_DATA trip updates for them)
         final TripIdentifier tripIdentifier = TripIdentifier.fromGtfsTripDescriptor(tripUpdate.getTrip());
         final Instant tripStartTime = tripIdentifier.getZonedStartTime(timezone).toInstant();
 
+        //Keep track of trips that have produced trip updates (to avoid creating NO_DATA trip updates for them)
         tripsWithTripUpdates.put(tripIdentifier, true);
 
         if (tripUpdate.getStopTimeUpdateCount() == 0) {
