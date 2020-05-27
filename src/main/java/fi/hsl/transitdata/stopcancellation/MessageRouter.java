@@ -41,13 +41,15 @@ public class MessageRouter implements IMessageHandler {
                     if (schema.schema == ProtobufSchema.StopCancellations) {
                         stopCancellationProcessor.updateStopCancellations(InternalMessages.StopCancellations.parseFrom(received.getData()));
 
+                        final long timestampSeconds = received.getEventTime() / 1000; //Pulsar timestamp in milliseconds, trip update in seconds
+
                         //Create NO_DATA trip updates for trips that have cancelled stops but are not producing trip updates yet
                         stopCancellationProcessor
-                                .getStopCancellationTripUpdates(received.getEventTime())
+                                .getStopCancellationTripUpdates(timestampSeconds)
                                 .forEach(tripUpdateWithId -> {
                                     sendTripUpdate(tripUpdateWithId.id,
                                             tripUpdateWithId.tripUpdate,
-                                            received.getEventTime() / 1000); //Pulsar timestamp in milliseconds, trip update in seconds
+                                            timestampSeconds);
                                 });
                     } else if (schema.schema == ProtobufSchema.GTFS_TripUpdate) {
                         final GtfsRealtime.FeedMessage feedMessage = GtfsRealtime.FeedMessage.parseFrom(received.getData());
