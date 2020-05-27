@@ -45,6 +45,7 @@ public class MessageRouter implements IMessageHandler {
                         stopCancellationProcessor
                                 .getStopCancellationTripUpdates(received.getEventTime() / 1000) //Pulsar timestamp in milliseconds, trip update in seconds
                                 .forEach(tripUpdateWithId -> {
+                                    log.debug("Sending stop cancellation trip update for {}", tripUpdateWithId.id);
                                     sendTripUpdate(tripUpdateWithId.id,
                                             tripUpdateWithId.tripUpdate,
                                             received.getEventTime());
