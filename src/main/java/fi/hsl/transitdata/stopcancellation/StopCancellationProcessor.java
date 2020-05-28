@@ -178,6 +178,9 @@ public class StopCancellationProcessor {
         tripUpdates.addAll(tripUpdatesWithStopCancellations);
         tripUpdates.addAll(cancellationsOfCancellations);
 
+        final Set<String> tripIds = tripUpdates.stream().map(tripUpdateWithId -> tripUpdateWithId.id).collect(Collectors.toSet());
+        LOG.debug("Distinct trip IDs: " + tripIds.size());
+
         LOG.info("Created {} trip updates for future stop cancellations and {} trip updates for cancellations of stop cancellations",
                 tripUpdatesWithStopCancellations.size(),
                 cancellationsOfCancellations.size());
