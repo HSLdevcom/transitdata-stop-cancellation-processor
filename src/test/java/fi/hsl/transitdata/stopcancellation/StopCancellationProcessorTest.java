@@ -6,6 +6,7 @@ import fi.hsl.transitdata.stopcancellation.models.TripUpdateWithId;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Collection;
@@ -22,7 +23,7 @@ public class StopCancellationProcessorTest {
 
     @Before
     public void setup() {
-        stopCancellationProcessor = new StopCancellationProcessor(timezone);
+        stopCancellationProcessor = new StopCancellationProcessor(timezone, Duration.ofHours(2), Duration.ofDays(3));
 
         InternalMessages.JourneyPattern journeyPattern1 = InternalMessages.JourneyPattern.newBuilder()
                 .setJourneyPatternId("1")
