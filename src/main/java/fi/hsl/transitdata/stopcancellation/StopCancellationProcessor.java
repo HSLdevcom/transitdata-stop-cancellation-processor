@@ -14,6 +14,7 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static fi.hsl.transitdata.stopcancellation.TripInfoUtils.*;
@@ -116,8 +117,6 @@ public class StopCancellationProcessor {
                     for (InternalMessages.TripInfo tripInfo : journeyPattern.getTripsList()) {
                         final TripIdentifier tripIdentifier = TripIdentifier.fromTripInfo(tripInfo);
 
-                        final Instant tripStartTime = tripIdentifier.getZonedStartTime(timezone).toInstant();
-
                         if (Boolean.TRUE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifier))) {
                             //Trip had already published trip update, no need to create trip update with NO_DATA
                             continue;
@@ -127,12 +126,7 @@ public class StopCancellationProcessor {
                                 .map(stopTimeUpdate -> {
                                     final boolean isStopCancelled = stopCancellationsByStopId.getOrDefault(stopTimeUpdate.getStopId(), Collections.emptyList())
                                             .stream()
-                                            .anyMatch(stopCancellation -> {
-                                                final Instant from = Instant.ofEpochSecond(stopCancellation.getValidFromUnixS());
-                                                final Instant to = Instant.ofEpochSecond(stopCancellation.getValidToUnixS());
-
-                                                return from.isBefore(tripStartTime) && to.isAfter(tripStartTime);
-                                            });
+                                            .anyMatch(isTripAffectedByStopCancellation(tripIdentifier, journeyPatternIdByTripIdentifier.get(tripIdentifier)));
 
                                     return isStopCancelled ?
                                             stopTimeUpdate.toBuilder().setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED).build() :
@@ -183,8 +177,8 @@ public class StopCancellationProcessor {
         tripUpdates.addAll(tripUpdatesWithStopCancellations);
         tripUpdates.addAll(cancellationsOfCancellations);
 
-        final Set<String> tripIds = tripUpdates.stream().map(tripUpdateWithId -> tripUpdateWithId.id).collect(Collectors.toSet());
-        LOG.debug("Distinct trip IDs: " + tripIds.size());
+        /*final Set<String> tripIds = tripUpdates.stream().map(tripUpdateWithId -> tripUpdateWithId.id).collect(Collectors.toSet());
+        LOG.debug("Distinct trip IDs: " + tripIds.size());*/
 
         LOG.info("Created {} trip updates for future stop cancellations and {} trip updates for cancellations of stop cancellations",
                 tripUpdatesWithStopCancellations.size(),
@@ -200,7 +194,6 @@ public class StopCancellationProcessor {
      */
     public GtfsRealtime.TripUpdate applyStopCancellations(GtfsRealtime.TripUpdate tripUpdate) {
         final TripIdentifier tripIdentifier = TripIdentifier.fromGtfsTripDescriptor(tripUpdate.getTrip());
-        final Instant tripStartTime = tripIdentifier.getZonedStartTime(timezone).toInstant();
 
         //Keep track of trips that have produced trip updates (to avoid creating NO_DATA trip updates for them)
         tripsWithTripUpdates.put(tripIdentifier, true);
@@ -230,12 +223,7 @@ public class StopCancellationProcessor {
                             createNoDataStopTimeUpdate(stop.getStopId());
 
                     final boolean stopCancelled = stopCancellationsByStopId.getOrDefault(stop.getStopId(), Collections.emptyList()).stream()
-                            .anyMatch(stopCancellation -> {
-                                final Instant from = Instant.ofEpochSecond(stopCancellation.getValidFromUnixS());
-                                final Instant to = Instant.ofEpochSecond(stopCancellation.getValidToUnixS());
-
-                                return from.isBefore(tripStartTime) && to.isAfter(tripStartTime) && stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPatternId);
-                            });
+                            .anyMatch(isTripAffectedByStopCancellation(tripIdentifier, journeyPatternId));
 
                     if (stopCancelled) {
                         LOG.debug("Cancelled stop {} for trip {}", stop.getStopId(), tripIdentifier);
@@ -247,6 +235,23 @@ public class StopCancellationProcessor {
 
         //Replace original stop time updates with ones where stop cancellations have been applied
         return tripUpdate.toBuilder().clearStopTimeUpdate().addAllStopTimeUpdate(stopTimeUpdateList).build();
+    }
+
+    private Predicate<InternalMessages.StopCancellations.StopCancellation> isTripAffectedByStopCancellation(final TripIdentifier tripIdentifier, final String journeyPatternId) {
+        return stopCancellation -> {
+            //Stop cancellation affects only a single trip
+            if (stopCancellation.getCause() == InternalMessages.StopCancellations.Cause.JOURNEY_DETOUR) {
+                return TripIdentifier.fromTripInfo(stopCancellation.getAffectedTrip()).equals(tripIdentifier);
+            } else {
+                //Check if trip is affected by stop cancellation
+                final Instant from = Instant.ofEpochSecond(stopCancellation.getValidFromUnixS());
+                final Instant to = Instant.ofEpochSecond(stopCancellation.getValidToUnixS());
+
+                final Instant tripStartTime = tripIdentifier.getZonedStartTime(timezone).toInstant();
+
+                return from.isBefore(tripStartTime) && to.isAfter(tripStartTime) && stopCancellation.getAffectedJourneyPatternIdsList().contains(journeyPatternId);
+            }
+        };
     }
 
     private static GtfsRealtime.TripUpdate.StopTimeUpdate createNoDataStopTimeUpdate(final String stopId) {
