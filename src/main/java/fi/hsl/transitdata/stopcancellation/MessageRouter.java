@@ -2,6 +2,7 @@ package fi.hsl.transitdata.stopcancellation;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.transit.realtime.GtfsRealtime;
+import com.typesafe.config.Config;
 import fi.hsl.common.gtfsrt.FeedMessageFactory;
 import fi.hsl.common.pulsar.IMessageHandler;
 import fi.hsl.common.pulsar.PulsarApplicationContext;
@@ -30,7 +31,11 @@ public class MessageRouter implements IMessageHandler {
         consumer = context.getConsumer();
         producer = context.getProducer();
 
-        stopCancellationProcessor = new StopCancellationProcessor(ZoneId.of(context.getConfig().getString("processor.timezone")));
+        final Config config = context.getConfig();
+
+        stopCancellationProcessor = new StopCancellationProcessor(ZoneId.of(config.getString("processor.timezone")),
+                config.getDuration("processor.tripUpdateCacheDuration"),
+                config.getDuration("processor.tripStopCancellationCacheDuration"));
     }
 
     public void handleMessage(Message received) throws Exception {

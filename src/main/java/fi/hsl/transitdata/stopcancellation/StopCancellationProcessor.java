@@ -29,12 +29,15 @@ public class StopCancellationProcessor {
     private Map<TripIdentifier, String> journeyPatternIdByTripIdentifier;
 
     //Cache of trips that have produced trip updates
-    private final Cache<TripIdentifier, Boolean> tripsWithTripUpdates = Caffeine.newBuilder().expireAfterWrite(Duration.ofMinutes(10)).build();
+    private final Cache<TripIdentifier, Boolean> tripsWithTripUpdates;
 
     //Cache of trips that we have sent trip updates with cancelled stops
-    private final Cache<TripIdentifier, String> tripsWithCancellations = Caffeine.newBuilder().expireAfterWrite(Duration.ofDays(3)).build(); //TODO: duration should be configurable
+    private final Cache<TripIdentifier, String> tripsWithCancellations;
 
-    public StopCancellationProcessor(ZoneId timezone) {
+    public StopCancellationProcessor(ZoneId timezone, Duration tripWithTripUpdateCacheDuration, Duration tripWithCancellationCacheDuration) {
+        tripsWithTripUpdates = Caffeine.newBuilder().expireAfterWrite(tripWithTripUpdateCacheDuration).build();
+        tripsWithCancellations = Caffeine.newBuilder().expireAfterWrite(tripWithCancellationCacheDuration).build();
+
         this.timezone = timezone;
     }
 
@@ -73,8 +76,10 @@ public class StopCancellationProcessor {
      */
     private Collection<TripUpdateWithId> getTripUpdatesForCancellationsOfCancellations(final long timestamp) {
         return tripsWithCancellations.asMap().entrySet().stream()
-                .filter(tripIdentifierAndId -> !journeyPatternIdByTripIdentifier.containsKey(tripIdentifierAndId.getKey())) //Trip does not have any active cancellations
-                .filter(tripIdentifierAndId -> !Boolean.TRUE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifierAndId.getKey()))) //Trip has not sent trip updates (which would effectively cancel cancellations)
+                //Trip does not have any active cancellations
+                .filter(tripIdentifierAndId -> !journeyPatternIdByTripIdentifier.containsKey(tripIdentifierAndId.getKey()))
+                //Trip has not sent trip updates (which would effectively cancel cancellations)
+                .filter(tripIdentifierAndId -> !Boolean.TRUE.equals(tripsWithTripUpdates.getIfPresent(tripIdentifierAndId.getKey())))
                 .map(tripIdentifierAndId -> {
                     //Create trip update that cancels all stop cancellations
                     GtfsRealtime.TripUpdate tripUpdate = GtfsRealtime.TripUpdate.newBuilder()
