@@ -16,19 +16,26 @@ import org.apache.pulsar.client.api.Producer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.ZoneId;
 import java.util.*;
 
 public class MessageRouter implements IMessageHandler {
     private static final Logger log = LoggerFactory.getLogger(MessageRouter.class);
 
-    private Consumer<byte[]> consumer;
-    private Producer<byte[]> producer;
+    private final Consumer<byte[]> consumer;
+    private final Producer<byte[]> producer;
 
-    private StopCancellationProcessor stopCancellationProcessor = new StopCancellationProcessor();
+    private final StopCancellationProcessor stopCancellationProcessor;
 
     public MessageRouter(PulsarApplicationContext context) {
         consumer = context.getConsumer();
         producer = context.getProducer();
+
+        final Config config = context.getConfig();
+
+        stopCancellationProcessor = new StopCancellationProcessor(ZoneId.of(config.getString("processor.timezone")),
+                config.getDuration("processor.tripUpdateCacheDuration"),
+                config.getDuration("processor.tripStopCancellationCacheDuration"));
     }
 
     public void handleMessage(Message received) throws Exception {
@@ -36,13 +43,35 @@ public class MessageRouter implements IMessageHandler {
             Optional<TransitdataSchema> maybeSchema = TransitdataSchema.parseFromPulsarMessage(received);
             maybeSchema.ifPresent(schema -> {
                 try {
-                    if (schema.schema == ProtobufSchema.StopCancellation) {
+                    if (schema.schema == ProtobufSchema.StopCancellations) {
                         stopCancellationProcessor.updateStopCancellations(InternalMessages.StopCancellations.parseFrom(received.getData()));
-                    } else if (schema.schema == ProtobufSchema.GTFS_TripUpdate) {
-                        final String tripId = received.getKey();
-                        final GtfsRealtime.TripUpdate tripUpdate = stopCancellationProcessor.processStopCancellations(GtfsRealtime.TripUpdate.parseFrom(received.getData()));
 
-                        sendTripUpdate(tripId, tripUpdate, received.getEventTime());
+                        //Create NO_DATA trip updates for trips that have cancelled stops but are not producing trip updates yet
+                        stopCancellationProcessor
+                                .getStopCancellationTripUpdates(received.getEventTime() / 1000) //Pulsar timestamp in milliseconds, trip update in seconds
+                                .forEach(tripUpdateWithId -> {
+                                    log.debug("Sending stop cancellation trip update for {}", tripUpdateWithId.id);
+                                    sendTripUpdate(tripUpdateWithId.id,
+                                            tripUpdateWithId.tripUpdate,
+                                            received.getEventTime());
+                                });
+                    } else if (schema.schema == ProtobufSchema.GTFS_TripUpdate) {
+                        final GtfsRealtime.FeedMessage feedMessage = GtfsRealtime.FeedMessage.parseFrom(received.getData());
+
+                        if (feedMessage.getEntityCount() == 1) {
+                            final GtfsRealtime.FeedEntity entity = feedMessage.getEntity(0);
+
+                            if (entity.hasTripUpdate()) {
+                                final String tripId = received.getKey();
+                                final GtfsRealtime.TripUpdate tripUpdate = stopCancellationProcessor.applyStopCancellations(feedMessage.getEntity(0).getTripUpdate());
+
+                                sendTripUpdate(tripId, tripUpdate, received.getEventTime());
+                            } else {
+                                log.warn("Feed entity {} did not contain a trip update", entity.getId());
+                            }
+                        } else {
+                            log.warn("Feed message had invalid amount of entities: {}, expected 1", feedMessage.getEntityCount());
+                        }
                     } else {
                         log.warn("Received message with unknown schema ({}), ignoring", schema);
                     }
