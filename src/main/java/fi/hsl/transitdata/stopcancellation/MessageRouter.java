@@ -64,7 +64,7 @@ public class MessageRouter implements IMessageHandler {
                                 .getStopCancellationTripUpdates(received.getEventTime() / 1000); //Pulsar timestamp in milliseconds, trip update in seconds
 
                         //Throttle sending future trip updates to avoid overloading MQTT broker
-                        //TODO: consider if there would be another way to avoid overloading MQTT broker, e.g. batcing messages
+                        //TODO: consider if there would be another way to avoid overloading MQTT broker, e.g. batching messages
                         throttledConsumer.consumeThrottled(tripUpdates, tripUpdateWithId -> {
                             log.debug("Sending stop cancellation trip update for {}", tripUpdateWithId.id);
                             sendTripUpdate(tripUpdateWithId.id,
