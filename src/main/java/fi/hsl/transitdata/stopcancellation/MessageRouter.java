@@ -40,7 +40,7 @@ public class MessageRouter implements IMessageHandler {
         final Config config = context.getConfig();
 
         throttledConsumer = new ThrottledConsumer(Executors.newSingleThreadExecutor(runnable -> {
-            final Thread thread = new Thread();
+            final Thread thread = new Thread(runnable);
             thread.setDaemon(true);
             return thread;
         }));
