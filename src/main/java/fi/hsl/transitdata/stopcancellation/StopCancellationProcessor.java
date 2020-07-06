@@ -24,10 +24,10 @@ public class StopCancellationProcessor {
 
     private final ZoneId timezone;
 
-    private Map<String, List<InternalMessages.StopCancellations.StopCancellation>> stopCancellationsByStopId;
-    private Map<String, InternalMessages.JourneyPattern> journeyPatternById;
+    private Map<String, List<InternalMessages.StopCancellations.StopCancellation>> stopCancellationsByStopId = Collections.emptyMap();
+    private Map<String, InternalMessages.JourneyPattern> journeyPatternById = Collections.emptyMap();
     //Maps trips that are affected by any stop cancellation to journey patterns
-    private Map<TripIdentifier, String> journeyPatternIdByTripIdentifier;
+    private Map<TripIdentifier, String> journeyPatternIdByTripIdentifier = Collections.emptyMap();
 
     //Cache of trips that have produced trip updates
     private final Cache<TripIdentifier, Boolean> tripsWithTripUpdates;
