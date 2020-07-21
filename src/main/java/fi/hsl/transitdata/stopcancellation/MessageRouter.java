@@ -10,6 +10,7 @@ import fi.hsl.common.transitdata.TransitdataProperties;
 import fi.hsl.common.transitdata.TransitdataProperties.*;
 import fi.hsl.common.transitdata.TransitdataSchema;
 import fi.hsl.common.transitdata.proto.InternalMessages;
+import fi.hsl.transitdata.stopcancellation.models.TripUpdateWithId;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.Producer;
@@ -18,12 +19,17 @@ import org.slf4j.LoggerFactory;
 
 import java.time.ZoneId;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MessageRouter implements IMessageHandler {
     private static final Logger log = LoggerFactory.getLogger(MessageRouter.class);
 
     private final Consumer<byte[]> consumer;
     private final Producer<byte[]> producer;
+
+    private final ThrottledConsumer throttledConsumer;
+    private final long futureTripUpdateSendDuration;
 
     private final StopCancellationProcessor stopCancellationProcessor;
 
@@ -32,6 +38,13 @@ public class MessageRouter implements IMessageHandler {
         producer = context.getProducer();
 
         final Config config = context.getConfig();
+
+        throttledConsumer = new ThrottledConsumer(Executors.newSingleThreadExecutor(runnable -> {
+            final Thread thread = new Thread(runnable);
+            thread.setDaemon(true);
+            return thread;
+        }));
+        futureTripUpdateSendDuration = config.getDuration("processor.futureTripUpdateSendDuration").toMillis();
 
         stopCancellationProcessor = new StopCancellationProcessor(ZoneId.of(config.getString("processor.timezone")),
                 config.getDuration("processor.tripUpdateCacheDuration"),
@@ -47,14 +60,17 @@ public class MessageRouter implements IMessageHandler {
                         stopCancellationProcessor.updateStopCancellations(InternalMessages.StopCancellations.parseFrom(received.getData()));
 
                         //Create NO_DATA trip updates for trips that have cancelled stops but are not producing trip updates yet
-                        stopCancellationProcessor
-                                .getStopCancellationTripUpdates(received.getEventTime() / 1000) //Pulsar timestamp in milliseconds, trip update in seconds
-                                .forEach(tripUpdateWithId -> {
-                                    log.debug("Sending stop cancellation trip update for {}", tripUpdateWithId.id);
-                                    sendTripUpdate(tripUpdateWithId.id,
-                                            tripUpdateWithId.tripUpdate,
-                                            received.getEventTime());
-                                });
+                        Collection<TripUpdateWithId> tripUpdates = stopCancellationProcessor
+                                .getStopCancellationTripUpdates(received.getEventTime() / 1000); //Pulsar timestamp in milliseconds, trip update in seconds
+
+                        //Throttle sending future trip updates to avoid overloading MQTT broker
+                        //TODO: consider if there would be another way to avoid overloading MQTT broker, e.g. batching messages
+                        throttledConsumer.consumeThrottled(tripUpdates, tripUpdateWithId -> {
+                            log.debug("Sending stop cancellation trip update for {}", tripUpdateWithId.id);
+                            sendTripUpdate(tripUpdateWithId.id,
+                                    tripUpdateWithId.tripUpdate,
+                                    received.getEventTime());
+                        }, futureTripUpdateSendDuration);
                     } else if (schema.schema == ProtobufSchema.GTFS_TripUpdate) {
                         final GtfsRealtime.FeedMessage feedMessage = GtfsRealtime.FeedMessage.parseFrom(received.getData());
 
@@ -86,8 +102,7 @@ public class MessageRouter implements IMessageHandler {
                         return null;
                     })
                     .thenRun(() -> {});
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             log.error("Exception while handling message", e);
         }
     }
