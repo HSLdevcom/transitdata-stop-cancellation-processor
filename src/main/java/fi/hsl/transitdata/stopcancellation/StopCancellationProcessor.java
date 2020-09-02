@@ -177,6 +177,9 @@ public class StopCancellationProcessor {
         tripUpdates.addAll(tripUpdatesWithStopCancellations);
         tripUpdates.addAll(cancellationsOfCancellations);
 
+        //Sort trip updates so that updates for earlier trips will be sent earlier
+        tripUpdates.sort(Comparator.comparing(tripUpdateWithId -> TripInfoUtils.getStartTime(tripUpdateWithId.tripUpdate.getTrip())));
+
         /*final Set<String> tripIds = tripUpdates.stream().map(tripUpdateWithId -> tripUpdateWithId.id).collect(Collectors.toSet());
         LOG.debug("Distinct trip IDs: " + tripIds.size());*/
 
