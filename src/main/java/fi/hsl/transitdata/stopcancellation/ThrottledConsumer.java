@@ -19,6 +19,11 @@ public class ThrottledConsumer {
      * @param <T>
      */
     public <T> void consumeThrottled(Collection<T> items, Consumer<T> consumer, long time) {
+        if (items.isEmpty()) {
+            //Nothing to consume
+            return;
+        }
+
         executorService.execute(() -> {
             final long delay = time / items.size();
             try {
