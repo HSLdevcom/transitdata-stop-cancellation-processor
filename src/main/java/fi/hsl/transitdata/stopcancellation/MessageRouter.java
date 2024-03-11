@@ -80,6 +80,16 @@ public class MessageRouter implements IMessageHandler {
                             if (entity.hasTripUpdate()) {
                                 final String tripId = received.getKey();
                                 final GtfsRealtime.TripUpdate tripUpdate = stopCancellationProcessor.applyStopCancellations(feedMessage.getEntity(0).getTripUpdate());
+                                
+                                for (GtfsRealtime.TripUpdate.StopTimeUpdate stopTimeUpdate : tripUpdate.getStopTimeUpdateList()) {
+                                    if (stopTimeUpdate.getStopTimeProperties() != null) {
+                                        stopTimeUpdate.getStopTimeProperties().getAssignedStopId();
+                                        log.info("AssignedStopId is set. StopId={}, StopSequence={}, RouteId={}, DirectionId={}, OperationDay={}, StartTime={}",
+                                                stopTimeUpdate.getStopId(), stopTimeUpdate.getStopSequence(), tripUpdate.getTrip().getRouteId(),
+                                                tripUpdate.getTrip().getDirectionId(), tripUpdate.getTrip().getStartDate(),
+                                                tripUpdate.getTrip().getStartTime());
+                                    }
+                                }
 
                                 sendTripUpdate(tripId, tripUpdate, received.getEventTime());
                             } else {
