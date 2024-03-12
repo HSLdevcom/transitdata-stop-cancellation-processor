@@ -85,13 +85,8 @@ public class MessageRouter implements IMessageHandler {
                                 for (GtfsRealtime.TripUpdate.StopTimeUpdate stopTimeUpdate : tripUpdate.getStopTimeUpdateList()) {
                                     String assignedStopId = stopTimeUpdate.getStopTimeProperties().getAssignedStopId();
                                     
-                                    if (StringUtils.isNotBlank(assignedStopId)) {
+                                    if (stopTimeUpdate.getStopTimeProperties() != null && StringUtils.isNotBlank(assignedStopId)) {
                                         log.info("AssignedStopId is set. AssignedStopId={}, StopId={}, StopSequence={}, RouteId={}, DirectionId={}, OperationDay={}, StartTime={}",
-                                                assignedStopId, stopTimeUpdate.getStopId(), stopTimeUpdate.getStopSequence(),
-                                                tripUpdate.getTrip().getRouteId(), tripUpdate.getTrip().getDirectionId(),
-                                                tripUpdate.getTrip().getStartDate(), tripUpdate.getTrip().getStartTime());
-                                    } else if ("2015".equals(tripUpdate.getTrip().getRouteId())) {
-                                        log.info("Route is 2015. AssignedStopId={}, StopId={}, StopSequence={}, RouteId={}, DirectionId={}, OperationDay={}, StartTime={}",
                                                 assignedStopId, stopTimeUpdate.getStopId(), stopTimeUpdate.getStopSequence(),
                                                 tripUpdate.getTrip().getRouteId(), tripUpdate.getTrip().getDirectionId(),
                                                 tripUpdate.getTrip().getStartDate(), tripUpdate.getTrip().getStartTime());
