@@ -14,6 +14,7 @@ import fi.hsl.transitdata.stopcancellation.models.TripUpdateWithId;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.Producer;
+import org.apache.pulsar.shade.org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,6 +81,17 @@ public class MessageRouter implements IMessageHandler {
                             if (entity.hasTripUpdate()) {
                                 final String tripId = received.getKey();
                                 final GtfsRealtime.TripUpdate tripUpdate = stopCancellationProcessor.applyStopCancellations(feedMessage.getEntity(0).getTripUpdate());
+                                
+                                for (GtfsRealtime.TripUpdate.StopTimeUpdate stopTimeUpdate : tripUpdate.getStopTimeUpdateList()) {
+                                    String assignedStopId = stopTimeUpdate.getStopTimeProperties().getAssignedStopId();
+                                    
+                                    if (stopTimeUpdate.getStopTimeProperties() != null && StringUtils.isNotBlank(assignedStopId)) {
+                                        log.info("AssignedStopId is set. AssignedStopId={}, StopId={}, StopSequence={}, RouteId={}, DirectionId={}, OperationDay={}, StartTime={}",
+                                                assignedStopId, stopTimeUpdate.getStopId(), stopTimeUpdate.getStopSequence(),
+                                                tripUpdate.getTrip().getRouteId(), tripUpdate.getTrip().getDirectionId(),
+                                                tripUpdate.getTrip().getStartDate(), tripUpdate.getTrip().getStartTime());
+                                    }
+                                }
 
                                 sendTripUpdate(tripId, tripUpdate, received.getEventTime());
                             } else {

@@ -14,9 +14,9 @@
     
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-        <common.version>1.3.25</common.version>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <common.version>1.6.1</common.version>
     </properties>
     <profiles>
         <!-- The Configuration of the unit-test profile -->
