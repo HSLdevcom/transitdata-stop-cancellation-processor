@@ -58,7 +58,8 @@ public class MessageRouter implements IMessageHandler {
             maybeSchema.ifPresent(schema -> {
                 try {
                     if (schema.schema == ProtobufSchema.StopCancellations) {
-                        stopCancellationProcessor.updateStopCancellations(InternalMessages.StopCancellations.parseFrom(received.getData()));
+                        stopCancellationProcessor.updateStopCancellations(
+                                InternalMessages.StopCancellations.parseFrom(received.getData()));
 
                         //Create NO_DATA trip updates for trips that have cancelled stops but are not producing trip updates yet
                         Collection<TripUpdateWithId> tripUpdates = stopCancellationProcessor
@@ -68,28 +69,33 @@ public class MessageRouter implements IMessageHandler {
                         //TODO: consider if there would be another way to avoid overloading MQTT broker, e.g. batching messages
                         throttledConsumer.consumeThrottled(tripUpdates, tripUpdateWithId -> {
                             log.debug("Sending stop cancellation trip update for {}", tripUpdateWithId.id);
-                            sendTripUpdate(tripUpdateWithId.id,
-                                    tripUpdateWithId.tripUpdate,
-                                    received.getEventTime());
+                            sendTripUpdate(tripUpdateWithId.id, tripUpdateWithId.tripUpdate, received.getEventTime());
                         }, futureTripUpdateSendDuration);
                     } else if (schema.schema == ProtobufSchema.GTFS_TripUpdate) {
-                        final GtfsRealtime.FeedMessage feedMessage = GtfsRealtime.FeedMessage.parseFrom(received.getData());
+                        final GtfsRealtime.FeedMessage feedMessage = GtfsRealtime.FeedMessage
+                                .parseFrom(received.getData());
 
                         if (feedMessage.getEntityCount() == 1) {
                             final GtfsRealtime.FeedEntity entity = feedMessage.getEntity(0);
 
                             if (entity.hasTripUpdate()) {
                                 final String tripId = received.getKey();
-                                final GtfsRealtime.TripUpdate tripUpdate = stopCancellationProcessor.applyStopCancellations(feedMessage.getEntity(0).getTripUpdate());
-                                
-                                for (GtfsRealtime.TripUpdate.StopTimeUpdate stopTimeUpdate : tripUpdate.getStopTimeUpdateList()) {
+                                final GtfsRealtime.TripUpdate tripUpdate = stopCancellationProcessor
+                                        .applyStopCancellations(feedMessage.getEntity(0).getTripUpdate());
+
+                                for (GtfsRealtime.TripUpdate.StopTimeUpdate stopTimeUpdate : tripUpdate
+                                        .getStopTimeUpdateList()) {
                                     String assignedStopId = stopTimeUpdate.getStopTimeProperties().getAssignedStopId();
-                                    
-                                    if (stopTimeUpdate.getStopTimeProperties() != null && StringUtils.isNotBlank(assignedStopId)) {
-                                        log.info("AssignedStopId is set. AssignedStopId={}, StopId={}, StopSequence={}, RouteId={}, DirectionId={}, OperationDay={}, StartTime={}",
-                                                assignedStopId, stopTimeUpdate.getStopId(), stopTimeUpdate.getStopSequence(),
-                                                tripUpdate.getTrip().getRouteId(), tripUpdate.getTrip().getDirectionId(),
-                                                tripUpdate.getTrip().getStartDate(), tripUpdate.getTrip().getStartTime());
+
+                                    if (stopTimeUpdate.getStopTimeProperties() != null
+                                            && StringUtils.isNotBlank(assignedStopId)) {
+                                        log.info(
+                                                "AssignedStopId is set. AssignedStopId={}, StopId={}, StopSequence={}, RouteId={}, DirectionId={}, OperationDay={}, StartTime={}",
+                                                assignedStopId, stopTimeUpdate.getStopId(),
+                                                stopTimeUpdate.getStopSequence(), tripUpdate.getTrip().getRouteId(),
+                                                tripUpdate.getTrip().getDirectionId(),
+                                                tripUpdate.getTrip().getStartDate(),
+                                                tripUpdate.getTrip().getStartTime());
                                     }
                                 }
 
@@ -98,7 +104,8 @@ public class MessageRouter implements IMessageHandler {
                                 log.warn("Feed entity {} did not contain a trip update", entity.getId());
                             }
                         } else {
-                            log.warn("Feed message had invalid amount of entities: {}, expected 1", feedMessage.getEntityCount());
+                            log.warn("Feed message had invalid amount of entities: {}, expected 1",
+                                    feedMessage.getEntityCount());
                         }
                     } else {
                         log.warn("Received message with unknown schema ({}), ignoring", schema);
@@ -108,27 +115,27 @@ public class MessageRouter implements IMessageHandler {
                 }
             });
 
-            consumer.acknowledgeAsync(received)
-                    .exceptionally(throwable -> {
-                        log.error("Failed to ack Pulsar message", throwable);
-                        return null;
-                    })
-                    .thenRun(() -> {});
+            consumer.acknowledgeAsync(received).exceptionally(throwable -> {
+                log.error("Failed to ack Pulsar message", throwable);
+                return null;
+            }).thenRun(() -> {
+            });
         } catch (Exception e) {
             log.error("Exception while handling message", e);
         }
     }
 
-    private void sendTripUpdate(final String tripId, final GtfsRealtime.TripUpdate tripUpdate, final long pulsarEventTimestamp) {
-        GtfsRealtime.FeedMessage feedMessage = FeedMessageFactory.createDifferentialFeedMessage(tripId, tripUpdate, tripUpdate.getTimestamp());
-        producer.newMessage()
-                .key(tripId)
-                .eventTime(pulsarEventTimestamp)
-                .property(TransitdataProperties.KEY_PROTOBUF_SCHEMA, TransitdataProperties.ProtobufSchema.GTFS_TripUpdate.toString())
-                .value(feedMessage.toByteArray())
-                .sendAsync()
-                .thenRun(() -> log.debug("Sending TripUpdate for {} with stop cancellations ({} StopTimeUpdates, status {})",
-                        tripId, tripUpdate.getStopTimeUpdateCount(), tripUpdate.getTrip().getScheduleRelationship()));
+    private void sendTripUpdate(final String tripId, final GtfsRealtime.TripUpdate tripUpdate,
+            final long pulsarEventTimestamp) {
+        GtfsRealtime.FeedMessage feedMessage = FeedMessageFactory.createDifferentialFeedMessage(tripId, tripUpdate,
+                tripUpdate.getTimestamp());
+        producer.newMessage().key(tripId).eventTime(pulsarEventTimestamp)
+                .property(TransitdataProperties.KEY_PROTOBUF_SCHEMA,
+                        TransitdataProperties.ProtobufSchema.GTFS_TripUpdate.toString())
+                .value(feedMessage.toByteArray()).sendAsync()
+                .thenRun(() -> log.debug(
+                        "Sending TripUpdate for {} with stop cancellations ({} StopTimeUpdates, status {})", tripId,
+                        tripUpdate.getStopTimeUpdateCount(), tripUpdate.getTrip().getScheduleRelationship()));
 
     }
 }

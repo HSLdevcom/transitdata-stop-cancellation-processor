@@ -34,7 +34,7 @@ public class ThrottledConsumerTest {
         long duration = System.currentTimeMillis() - start;
 
         assertTrue(duration >= 5000);
-        assertArrayEquals(new String[] { "a", "b", "c" }, output.toArray());
+        assertArrayEquals(new String[]{"a", "b", "c"}, output.toArray());
     }
 
     @Test
