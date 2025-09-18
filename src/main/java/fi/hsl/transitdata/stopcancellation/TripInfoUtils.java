@@ -7,11 +7,13 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public class TripInfoUtils {
-    private TripInfoUtils() {}
+    private TripInfoUtils() {
+    }
 
     //TODO: this should be in common as rail-tripupdate-source
     public static String getTrainEntityId(GtfsRealtime.TripDescriptor tripDescriptor) {
-        return "rail_" + String.join("-", tripDescriptor.getRouteId(), tripDescriptor.getStartDate(), tripDescriptor.getStartTime(), String.valueOf(tripDescriptor.getDirectionId()));
+        return "rail_" + String.join("-", tripDescriptor.getRouteId(), tripDescriptor.getStartDate(),
+                tripDescriptor.getStartTime(), String.valueOf(tripDescriptor.getDirectionId()));
     }
 
     public static LocalDateTime getStartTime(GtfsRealtime.TripDescriptor tripDescriptor) {
